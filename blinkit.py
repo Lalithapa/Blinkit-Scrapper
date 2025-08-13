@@ -7,13 +7,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.common.keys import Keys
 
+# import logging
+
 import pandas as pd
 import re
 from datetime import datetime
 import time
 
 INPUT_XLSX = "product_data.xlsx"              # your uploaded file name
-PINCODE = "110028"                            # change if needed
+PINCODE = "9/57, 9 Block, Ramesh Nagar, Delhi, 110015, India"                            # change if needed
 OUTPUT_XLSX = f"blinkit_scrapped_sheet_{datetime.now().strftime('%d-%m-%Y--%H-%M')}.xlsx"  # new file to be created
 OUTPUT_SHEET = "blinkit_scrapped_sheet"
 
@@ -39,7 +41,6 @@ def set_location(driver, pincode):
     loc_input = wait.until(EC.element_to_be_clickable((By.XPATH, '//input[@placeholder="search delivery location"]')))
     loc_input.clear()
     loc_input.send_keys(pincode)
-
     # pick first suggestion
     suggestion = wait.until(EC.element_to_be_clickable((By.XPATH, '//div[contains(@class,"LocationSearchList__LocationDetailContainer")]')))
     suggestion.click()
@@ -54,11 +55,21 @@ def open_url_and_get_price(driver, url):
 
     # Possible price locators on Blinkit PDP (keep a few fallbacks)
     price_locators = [
-        # PDP price container variations (class names often change; keep multiple robust options)
-        (By.XPATH, '//*[contains(@class,"SellingPrice") or contains(@class,"sellingPrice") or contains(@class,"Price")][1]'),
-        (By.XPATH, '//*[self::div or self::span][contains(text(),"₹")][1]'),
-        (By.XPATH, '//span[contains(@class,"rupee") or contains(text(),"₹")][1]')
+        # Common price class variants inside the parent
+        (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
+                '//*[contains(@class,"SellingPrice") or contains(@class,"sellingPrice") or contains(@class,"Price")][1]'),
+
+        # Any div/span containing ₹ inside the parent
+        (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
+                '//*[self::div or self::span][contains(normalize-space(.),"₹")][1]'),
+
+        # rupee-specific span or anything with ₹ inside the parent
+        (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
+                '//span[contains(@class,"rupee") or contains(normalize-space(.),"₹")][1]'),
     ]
+    # print(f"Trying to find price using {len(price_locators)} locators...")
+    # logging.getLogger('selenium').setLevel(logging.WARNING)
+    # logging.debug(f"Price locators: {price_locators}")
 
     for how, what in price_locators:
         try:
@@ -71,18 +82,9 @@ def open_url_and_get_price(driver, url):
             continue
         except StaleElementReferenceException:
             continue
-
-    # If not found in the above, try to peek at the "ADD" card area on PDP (sometimes same layout as listing)
-    try:
-        card = driver.find_element(By.XPATH, '//*[contains(@class,"AddToCart") or contains(., "ADD")]')
-        txt = card.text
-        price = extract_price(txt)
-        if price:
-            return price
-    except NoSuchElementException:
         pass
 
-    return None
+    return "Out of Stock"
 
 def search_title_and_get_price(driver, title):
     """Use the site search, pick the best-matching card that has ADD button, and read its price."""
@@ -190,7 +192,8 @@ def run():
         set_location(driver, PINCODE)
 
         for idx, row in df.iterrows():
-            # breakpoint()  # for debugging, remove in production
+            # if idx >= 3:
+            #     break
             sku = str(row.get("Sku Code", "")).strip()
             title = str(row.get("Product Name", "")).strip()
             url = str(row.get("Blinkit", "")).strip()
@@ -202,20 +205,20 @@ def run():
                 price = open_url_and_get_price(driver, url)
                 source = "url"
 
-            # Fallback to search by title
-            if price is None and title:
-                price = search_title_and_get_price(driver, title)
-                source = "search"
+            # # Fallback to search by title
+            # if price is None and title:
+            #     price = search_title_and_get_price(driver, title)
+            #     source = "search"
 
             out_rows.append({
                 "SKU Code": sku,
                 "Title": title,
                 "Product Url": url,
                 "Product Price": price,
-                # "Source": source
+                "Source": source
             })
             print(f"[{idx+1}/{len(df)}] {sku} | {title} -> {price} ({source})")
-
+        
         out_df = pd.DataFrame(out_rows)
         # save with requested sheet name
         with pd.ExcelWriter(OUTPUT_XLSX, engine="openpyxl") as writer:
