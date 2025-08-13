@@ -7,7 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.common.keys import Keys
 
-# import logging
+import logging
 
 import pandas as pd
 import re
@@ -49,42 +49,71 @@ def set_location(driver, pincode):
     wait.until(EC.element_to_be_clickable((By.XPATH, '//div[contains(@class,"SearchBar__AnimationWrapper")]')))
 
 def open_url_and_get_price(driver, url):
-    """Open product URL directly and try to read the price on PDP."""
+    """Open product URL directly and try to read the price or detect Out of Stock on PDP."""
     wait = WebDriverWait(driver, 20)
     driver.get(url)
 
-    # Possible price locators on Blinkit PDP (keep a few fallbacks)
-    price_locators = [
-        # Common price class variants inside the parent
-        (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
-                '//*[contains(@class,"SellingPrice") or contains(@class,"sellingPrice") or contains(@class,"Price")][1]'),
+    price_locator = (By.XPATH, '//*[contains(@class,"tw-text-400") and contains(@class,"tw-font-bold")][1]')
+    oos_locator = (By.XPATH, '//*[contains(@class,"tw-text-200") and contains(@class,"tw-font-medium") and contains(@class,"tw-text-grey-700")][1]')
 
-        # Any div/span containing ₹ inside the parent
-        (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
-                '//*[self::div or self::span][contains(normalize-space(.),"₹")][1]'),
+    try:
+        # Wait for either price or out-of-stock to appear
+        el = wait.until(EC.any_of(
+            EC.presence_of_element_located(price_locator),
+            EC.presence_of_element_located(oos_locator)
+        ))
 
-        # rupee-specific span or anything with ₹ inside the parent
-        (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
-                '//span[contains(@class,"rupee") or contains(normalize-space(.),"₹")][1]'),
-    ]
-    # print(f"Trying to find price using {len(price_locators)} locators...")
-    # logging.getLogger('selenium').setLevel(logging.WARNING)
-    # logging.debug(f"Price locators: {price_locators}")
+        txt = el.text.strip().lower()
 
-    for how, what in price_locators:
-        try:
-            el = wait.until(EC.presence_of_element_located((how, what)))
-            txt = el.text.strip()
+        if "out of stock" in txt:
+            return "Out of Stock"
+        else:
             price = extract_price(txt)
             if price:
                 return price
-        except TimeoutException:
-            continue
-        except StaleElementReferenceException:
-            continue
-        pass
 
-    return "Out of Stock"
+    except TimeoutException:
+        return None
+    
+# def open_url_and_get_price(driver, url):
+#     """Open product URL directly and try to read the price on PDP."""
+#     wait = WebDriverWait(driver, 20)
+#     driver.get(url)
+
+
+#     # First locator: price
+#     price_locator = (By.XPATH, '//*[contains(@class,"tw-text-400") and contains(@class,"tw-font-bold")][1]')
+
+    
+#     # Possible price locators on Blinkit PDP (keep a few fallbacks)
+#     price_locators = [
+#         # Common price class variants inside the parent
+#         (By.XPATH, '//*[contains(@class,"tw-text-400") and contains(@class,"tw-font-bold")][1]'),
+#         (By.XPATH, '//*[contains(@class,"tw-text-200") and contains(@class,"tw-font-medium") and contains(@class,"tw-text-grey-700")][1]'),
+
+#         # # Any div/span containing ₹ inside the parent
+#         # (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
+#         #         '//*[self::div or self::span][contains(normalize-space(.),"₹")][1]'),
+
+#         # # rupee-specific span or anything with ₹ inside the parent
+#         # (By.XPATH, '//*[contains(@class,"ProductDesktopBffEnabled__ProductWrapperRightSection-sc-1ikp3z2-4")]'
+#         #         '//span[contains(@class,"rupee") or contains(normalize-space(.),"₹")][1]'),
+#     ]
+
+#     for how, what in price_locators:
+#         try:
+#             el = wait.until(EC.presence_of_element_located((how, what)))
+#             txt = el.text.strip()
+#             price = extract_price(txt)
+#             if price:
+#                 return price
+#         except TimeoutException:
+#             continue
+#         except StaleElementReferenceException:
+#             continue
+#         pass
+
+#     return "Out of Stock"
 
 def search_title_and_get_price(driver, title):
     """Use the site search, pick the best-matching card that has ADD button, and read its price."""
