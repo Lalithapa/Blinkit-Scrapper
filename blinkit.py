@@ -194,18 +194,18 @@ def run():
             sku = str(row.get("Sku Code", "")).strip()
             title = str(row.get("Product Name", "")).strip()
             url = str(row.get("Blinkit", "")).strip()
-            price = 200
+            price = None
             source = None
 
-            # # Prefer URL when present
-            # if url and url.lower().startswith("http"):
-            #     price = open_url_and_get_price(driver, url)
-            #     source = "url"
+            # Prefer URL when present
+            if url and url.lower().startswith("http"):
+                price = open_url_and_get_price(driver, url)
+                source = "url"
 
-            # # Fallback to search by title
-            # if price is None and title:
-            #     price = search_title_and_get_price(driver, title)
-            #     source = "search"
+            # Fallback to search by title
+            if price is None and title:
+                price = search_title_and_get_price(driver, title)
+                source = "search"
 
             out_rows.append({
                 "SKU Code": sku,
