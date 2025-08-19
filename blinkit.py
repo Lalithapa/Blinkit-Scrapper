@@ -15,9 +15,9 @@ from datetime import datetime
 import time
 
 INPUT_XLSX = "product_data.xlsx"              # your uploaded file name
-PRIMARY_PINCODE = "122001"
-SECONDARY_PINCODE = "110044"
-TERTIARY_PINCODE = "122003"                          # change if needed
+PRIMARY_PINCODE = "560002"
+SECONDARY_PINCODE = "122001"
+TERTIARY_PINCODE = "110044"                          # change if needed
 OUTPUT_XLSX = f"blinkit_scrapped_sheet_{datetime.now().strftime('%d-%m-%Y--%H-%M')}.xlsx"  # new file to be created
 OUTPUT_SHEET = "blinkit_scrapped_sheet"
 
@@ -52,7 +52,7 @@ def set_location(driver, pincode):
 
 def open_url_and_get_price(driver, url):
     """Open product URL directly and try to read the price or detect Out of Stock on PDP."""
-    time.sleep(2)  # slight delay to ensure page is ready
+    time.sleep(1.8)  # slight delay to ensure page is ready
     wait = WebDriverWait(driver, 20)
     driver.get(url)
 
