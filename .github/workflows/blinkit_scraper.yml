@@ -1,9 +1,10 @@
 name: Daily Blinkit Scraper
 
 on:
-  # schedule:
-  #   # 3:30 PM IST → Convert to UTC (IST is UTC+5:30) → 10:00 AM UTC
-  #   - cron: "0 10 * * *"
+  schedule:
+    # 3:30 PM IST → Convert to UTC (IST is UTC+5:30) → 10:00 AM UTC
+    # - cron: "0 10 * * *"
+    - cron: "44 7 * * *"
   workflow_dispatch: # allows manual run
 
 jobs:
@@ -30,7 +31,7 @@ jobs:
 
       # Optional: Upload output file as an artifact
       - name: Upload output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: blinkit-scraped-output
           path: "*.xlsx"
